@@ -221,15 +221,24 @@ export function computeRequiredFields(
 ): Set<string> {
   const required = new Set([...dimensions, ...filterFields])
 
-  // If any measure has non-flow timeAggregation, add time dimensions
-  // not already in the requested dimensions
-  const hasStockMeasures = measures.some(m => m.timeAggregation && m.timeAggregation !== 'flow')
+  // A balance needs the time column in the view to roll up across time. That
+  // covers measures with a non-flow timeAggregation and value columns a flow
+  // declaration marks as stocks on some rows.
+  const stockColumns = new Set(
+    (schema.flowDeclarations ?? []).filter(f => f.stockValues.length > 0).map(f => f.valueColumn)
+  )
+  const hasStockMeasures = measures.some(m =>
+    (m.timeAggregation && m.timeAggregation !== 'flow') || stockColumns.has(m.sourceField)
+  )
   if (hasStockMeasures) {
     const dimSet = new Set(dimensions)
     for (const d of schema.dimensions) {
       if (d.isTimeDimension && d.sourceField && !dimSet.has(d.sourceField)) {
         required.add(d.sourceField)
       }
+    }
+    for (const t of schema.timeDimensions ?? []) {
+      if (!dimSet.has(t.sourceColumn)) required.add(t.sourceColumn)
     }
   }
 

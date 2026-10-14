@@ -154,6 +154,39 @@ describe('computeRequiredFields', () => {
 
 // ── shouldSkipSummaryViews ───────────────────────────────────────────
 
+describe('computeRequiredFields with declared time dimensions', () => {
+  const base = {
+    dimensions: [
+      { id: 'country', displayName: 'Country', sourceField: 'country' },
+      { id: 'month', displayName: 'Month', sourceField: 'month' },
+    ] as DimensionDefinition[],
+    hierarchies: [],
+    timeDimensions: [{ sourceColumn: 'month', granularity: 'month' as const, stockWeighting: 'days' as const }],
+  }
+
+  it('requires the time column for a balance measure', () => {
+    const balance = { id: 'bal', displayName: 'Balance', sourceField: 'balance', timeAggregation: 'eop' } as MeasureDefinition
+    const schema: QuerySchema = { ...base, measures: [balance] }
+    expect(computeRequiredFields(['country'], [], [balance], schema)).toEqual(new Set(['country', 'month']))
+  })
+
+  it('requires the time column for a value column a flow declaration marks as stock', () => {
+    const amount = { id: 'amount', displayName: 'Amount', sourceField: 'amount' } as MeasureDefinition
+    const schema: QuerySchema = {
+      ...base,
+      measures: [amount],
+      flowDeclarations: [{ dimensionId: 'kind', valueColumn: 'amount', stockValues: ['headcount'], flowValues: ['hires'] }],
+    }
+    expect(computeRequiredFields(['country'], [], [amount], schema)).toEqual(new Set(['country', 'month']))
+  })
+
+  it('does not require it for a flow measure', () => {
+    const rev = { id: 'rev', displayName: 'Revenue', sourceField: 'revenue' } as MeasureDefinition
+    const schema: QuerySchema = { ...base, measures: [rev] }
+    expect(computeRequiredFields(['country'], [], [rev], schema)).toEqual(new Set(['country']))
+  })
+})
+
 describe('shouldSkipSummaryViews', () => {
   it('returns true when any measure is AVG', () => {
     const measures = [
