@@ -81,7 +81,7 @@ it.
 
 ```bash
 npm install
-npm test        # 298 tests; each runs the generated SQL in an in-memory DuckDB
+npm test        # 301 tests; each runs the generated SQL in an in-memory DuckDB
 npm run typecheck
 ```
 

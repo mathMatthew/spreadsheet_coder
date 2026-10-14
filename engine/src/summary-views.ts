@@ -102,9 +102,12 @@ export function buildSummarySelectSQL(
     }
   }
 
+  // Measures that share a sourceField share one column
+  const emitted = new Set<string>()
   for (const m of eligibleMeasures(schema)) {
-    const fieldExpr = (m.expression && isValidSqlExpression(m.expression)) ? m.expression : quoteIdent(m.sourceField)
-    selectParts.push(`CAST(SUM(${fieldExpr}) AS DOUBLE) AS ${quoteIdent(m.sourceField)}`)
+    if (emitted.has(m.sourceField)) continue
+    emitted.add(m.sourceField)
+    selectParts.push(`CAST(SUM(${summedExpr(m)}) AS DOUBLE) AS ${quoteIdent(m.sourceField)}`)
   }
 
   if (selectParts.length === 0) return ''
@@ -251,14 +254,21 @@ export function getEligibleMeasureIds(schema: QuerySchema): string[] {
 
 /**
  * SUM measures, the only aggregation that re-aggregates correctly from a view.
- * A view column is named by the measure's sourceField, so when two SUM measures
- * share a sourceField neither can have its own column; both are left out and
- * queries needing them read the base table.
+ * A view column is named by the measure's sourceField. Measures sharing a
+ * sourceField can share that column only if they sum the same expression;
+ * otherwise all of them are left out and queries needing them read the base table.
  */
 function eligibleMeasures(schema: QuerySchema): MeasureDefinition[] {
   const sums = schema.measures.filter(m => (m.aggregation || 'sum') === 'sum')
-  const uses = new Map<string, number>()
-  for (const m of sums) uses.set(m.sourceField, (uses.get(m.sourceField) ?? 0) + 1)
-  return sums.filter(m => uses.get(m.sourceField) === 1)
+  const exprs = new Map<string, Set<string>>()
+  for (const m of sums) {
+    if (!exprs.has(m.sourceField)) exprs.set(m.sourceField, new Set())
+    exprs.get(m.sourceField)!.add(summedExpr(m))
+  }
+  return sums.filter(m => exprs.get(m.sourceField)!.size === 1)
+}
+
+function summedExpr(m: MeasureDefinition): string {
+  return (m.expression && isValidSqlExpression(m.expression)) ? m.expression : quoteIdent(m.sourceField)
 }
 

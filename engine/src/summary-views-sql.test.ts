@@ -313,4 +313,19 @@ describe('summary SQL edge cases', () => {
     const rows = sortRows(await queryAll(conn, 'SELECT * FROM view_dup'))
     expect(rows).toEqual([{ region: 'APAC', cost: 45 }, { region: 'EMEA', cost: 20 }])
   })
+
+  it('SUM measures that sum the same column share one view column', async () => {
+    const schema = makeSchema({
+      dimensions: [{ id: 'region', sourceField: 'region' }],
+      measures: [
+        { id: 'revenue', sourceField: 'revenue' },
+        { id: 'revenue_balance', sourceField: 'revenue', timeAggregation: 'eop' },
+      ],
+    })
+    expect(getEligibleMeasureIds(schema)).toEqual(['revenue', 'revenue_balance'])
+    const sql = buildSummarySelectSQL(schema, ['region'])
+    await exec(conn, `CREATE TABLE view_shared AS ${sql}`)
+    const rows = sortRows(await queryAll(conn, 'SELECT * FROM view_shared'))
+    expect(rows).toEqual([{ region: 'APAC', revenue: 125 }, { region: 'EMEA', revenue: 50 }])
+  })
 })
