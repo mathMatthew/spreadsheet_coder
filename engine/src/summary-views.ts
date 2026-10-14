@@ -242,6 +242,15 @@ export function computeRequiredFields(
     }
   }
 
+  // A long-format value column is only meaningful split by its qualifier
+  // dimension, so a view must keep that dimension to answer for it.
+  const measureColumns = new Set(measures.map(m => m.sourceField))
+  for (const f of schema.flowDeclarations ?? []) {
+    if (!measureColumns.has(f.valueColumn)) continue
+    const qualifier = schema.dimensions.find(d => d.id === f.dimensionId)
+    required.add(qualifier?.sourceField ?? f.dimensionId)
+  }
+
   return required
 }
 

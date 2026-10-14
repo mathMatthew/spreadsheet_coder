@@ -177,7 +177,18 @@ describe('computeRequiredFields with declared time dimensions', () => {
       measures: [amount],
       flowDeclarations: [{ dimensionId: 'kind', valueColumn: 'amount', stockValues: ['headcount'], flowValues: ['hires'] }],
     }
-    expect(computeRequiredFields(['country'], [], [amount], schema)).toEqual(new Set(['country', 'month']))
+    expect(computeRequiredFields(['country'], [], [amount], schema)).toEqual(new Set(['country', 'month', 'kind']))
+  })
+
+  it('requires the qualifier dimension for a long-format value column', () => {
+    const amount = { id: 'amount', displayName: 'Amount', sourceField: 'amount' } as MeasureDefinition
+    const schema: QuerySchema = {
+      ...base,
+      dimensions: [...base.dimensions, { id: 'kind_dim', displayName: 'Kind', sourceField: 'kind' }],
+      measures: [amount],
+      flowDeclarations: [{ dimensionId: 'kind_dim', valueColumn: 'amount', stockValues: [], flowValues: ['hires'] }],
+    }
+    expect(computeRequiredFields(['country'], [], [amount], schema)).toEqual(new Set(['country', 'kind']))
   })
 
   it('does not require it for a flow measure', () => {
