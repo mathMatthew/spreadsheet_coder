@@ -222,14 +222,11 @@ export function computeRequiredFields(
   const required = new Set([...dimensions, ...filterFields])
 
   // A balance needs the time column in the view to roll up across time. That
-  // covers measures with a non-flow timeAggregation and value columns a flow
-  // declaration marks as stocks on some rows.
-  const stockColumns = new Set(
-    (schema.flowDeclarations ?? []).filter(f => f.stockValues.length > 0).map(f => f.valueColumn)
-  )
-  const hasStockMeasures = measures.some(m =>
-    (m.timeAggregation && m.timeAggregation !== 'flow') || stockColumns.has(m.sourceField)
-  )
+  // covers measures with a non-flow timeAggregation and, since flow
+  // declarations put every query in long-form mode, any declared stock values.
+  const declarations = schema.flowDeclarations ?? []
+  const hasStockMeasures = declarations.some(f => f.stockValues.length > 0) ||
+    measures.some(m => m.timeAggregation && m.timeAggregation !== 'flow')
   if (hasStockMeasures) {
     const dimSet = new Set(dimensions)
     for (const d of schema.dimensions) {
@@ -242,11 +239,10 @@ export function computeRequiredFields(
     }
   }
 
-  // A long-format value column is only meaningful split by its qualifier
-  // dimension, so a view must keep that dimension to answer for it.
-  const measureColumns = new Set(measures.map(m => m.sourceField))
-  for (const f of schema.flowDeclarations ?? []) {
-    if (!measureColumns.has(f.valueColumn)) continue
+  // In long-form mode the query reads every declaration's qualifier dimension
+  // (to split stocks from flows and to drop excluded values), whichever
+  // measures were requested, so a view must keep all of them.
+  for (const f of declarations) {
     const qualifier = schema.dimensions.find(d => d.id === f.dimensionId)
     required.add(qualifier?.sourceField ?? f.dimensionId)
   }

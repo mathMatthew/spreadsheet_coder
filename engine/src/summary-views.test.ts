@@ -191,6 +191,16 @@ describe('computeRequiredFields with declared time dimensions', () => {
     expect(computeRequiredFields(['country'], [], [amount], schema)).toEqual(new Set(['country', 'kind']))
   })
 
+  it('requires every qualifier and the time column even for a measure no declaration covers', () => {
+    const cost = { id: 'cost', displayName: 'Cost', sourceField: 'cost' } as MeasureDefinition
+    const schema: QuerySchema = {
+      ...base,
+      measures: [cost],
+      flowDeclarations: [{ dimensionId: 'kind', valueColumn: 'amount', stockValues: ['headcount'], flowValues: [], excludeValues: ['total'] }],
+    }
+    expect(computeRequiredFields(['country'], [], [cost], schema)).toEqual(new Set(['country', 'month', 'kind']))
+  })
+
   it('does not require it for a flow measure', () => {
     const rev = { id: 'rev', displayName: 'Revenue', sourceField: 'revenue' } as MeasureDefinition
     const schema: QuerySchema = { ...base, measures: [rev] }
