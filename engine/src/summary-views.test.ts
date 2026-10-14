@@ -188,7 +188,8 @@ describe('computeRequiredFields with declared time dimensions', () => {
       measures: [amount],
       flowDeclarations: [{ dimensionId: 'kind_dim', valueColumn: 'amount', stockValues: [], flowValues: ['hires'] }],
     }
-    expect(computeRequiredFields(['country'], [], [amount], schema)).toEqual(new Set(['country', 'kind']))
+    // The time column too: long-form queries group by it even with no stocks
+    expect(computeRequiredFields(['country'], [], [amount], schema)).toEqual(new Set(['country', 'month', 'kind']))
   })
 
   it('requires every qualifier and the time column even for a measure no declaration covers', () => {

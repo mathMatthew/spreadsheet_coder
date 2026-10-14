@@ -221,11 +221,11 @@ export function computeRequiredFields(
 ): Set<string> {
   const required = new Set([...dimensions, ...filterFields])
 
-  // A balance needs the time column in the view to roll up across time. That
-  // covers measures with a non-flow timeAggregation and, since flow
-  // declarations put every query in long-form mode, any declared stock values.
+  // A balance needs the time column in the view to roll up across time. Flow
+  // declarations put every query in long-form mode, which always groups by the
+  // time columns, so any declaration needs them too.
   const declarations = schema.flowDeclarations ?? []
-  const hasStockMeasures = declarations.some(f => f.stockValues.length > 0) ||
+  const hasStockMeasures = declarations.length > 0 ||
     measures.some(m => m.timeAggregation && m.timeAggregation !== 'flow')
   if (hasStockMeasures) {
     const dimSet = new Set(dimensions)
