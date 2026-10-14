@@ -102,9 +102,7 @@ export function buildSummarySelectSQL(
     }
   }
 
-  // Eligible measures: SUM-only (other aggregations aren't decomposable for re-aggregation)
-  const eligible = schema.measures.filter(m => (m.aggregation || 'sum') === 'sum')
-  for (const m of eligible) {
+  for (const m of eligibleMeasures(schema)) {
     const fieldExpr = (m.expression && isValidSqlExpression(m.expression)) ? m.expression : quoteIdent(m.sourceField)
     selectParts.push(`CAST(SUM(${fieldExpr}) AS DOUBLE) AS ${quoteIdent(m.sourceField)}`)
   }
@@ -116,7 +114,7 @@ export function buildSummarySelectSQL(
     `FROM ${quoteIdent('data')}`,
   ]
   if (whereClause) lines.push(`WHERE ${whereClause}`)
-  lines.push(`GROUP BY ${groupByParts.join(', ')}`)
+  if (groupByParts.length > 0) lines.push(`GROUP BY ${groupByParts.join(', ')}`)
   return lines.join('\n')
 }
 
@@ -150,7 +148,7 @@ export function computeViewDimensions(
  * A view qualifies if its dimension set is a superset of all required fields.
  * Derived dimensions count as covered if their source column is in the view
  * (e.g. quarter derived from month — if the view has month, quarter is available).
- * Among qualifying views, we pick the one with fewest dimensions (smallest table).
+ * Among qualifying views, we pick the one with the fewest rows.
  */
 export function findBestView(
   views: SummaryViewMetadata[],
@@ -248,8 +246,19 @@ export function shouldSkipSummaryViews(measures: MeasureDefinition[]): boolean {
  * Get eligible measure IDs for summary views (SUM-only).
  */
 export function getEligibleMeasureIds(schema: QuerySchema): string[] {
-  return schema.measures
-    .filter(m => (m.aggregation || 'sum') === 'sum')
-    .map(m => m.id)
+  return eligibleMeasures(schema).map(m => m.id)
+}
+
+/**
+ * SUM measures, the only aggregation that re-aggregates correctly from a view.
+ * A view column is named by the measure's sourceField, so when two SUM measures
+ * share a sourceField neither can have its own column; both are left out and
+ * queries needing them read the base table.
+ */
+function eligibleMeasures(schema: QuerySchema): MeasureDefinition[] {
+  const sums = schema.measures.filter(m => (m.aggregation || 'sum') === 'sum')
+  const uses = new Map<string, number>()
+  for (const m of sums) uses.set(m.sourceField, (uses.get(m.sourceField) ?? 0) + 1)
+  return sums.filter(m => uses.get(m.sourceField) === 1)
 }
 

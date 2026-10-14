@@ -74,8 +74,8 @@ All in [`src/model.ts`](src/model.ts):
   use the rollup path for those.
 
 [`src/summary-views.ts`](src/summary-views.ts) builds pre-aggregated summary
-tables and, for a query, picks the one with the fewest dimensions that can
-answer it.
+tables and, for a query, picks the one with the fewest rows that can answer
+it.
 
 ## Tests
 

@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 
 
-import { buildSummarySelectSQL } from './summary-views'
+import { buildSummarySelectSQL, getEligibleMeasureIds } from './summary-views'
 import type { QuerySchema } from './query-builder'
 import duckdb from 'duckdb'
 import { makeSchema, queryAll, exec, sortRows } from './test-helpers'
@@ -268,5 +268,49 @@ describe('chunked summary equivalence', () => {
     const nullRow = sortedChunked.find(r => r.region === null)
     expect(nullRow).toBeDefined()
     expect(nullRow!.revenue).toBe(999)
+  })
+})
+
+// ── Edge cases that must still produce runnable SQL ──────────────────
+
+describe('summary SQL edge cases', () => {
+  let db: any
+  let conn: any
+
+  beforeAll(async () => {
+    db = new duckdb.Database(':memory:')
+    conn = db.connect()
+    await exec(conn, `
+      CREATE TABLE data (region VARCHAR, revenue DOUBLE, cost DOUBLE);
+      INSERT INTO data VALUES ('APAC', 100, 40), ('EMEA', 50, 20), ('APAC', 25, 5);
+    `)
+  })
+
+  afterAll(() => {
+    db?.close()
+  })
+
+  it('a view with no dimensions is one grand-total row', async () => {
+    const schema = makeSchema({ measures: [{ id: 'revenue', sourceField: 'revenue' }] })
+    const sql = buildSummarySelectSQL(schema, [])
+    expect(sql).not.toContain('GROUP BY')
+    const rows = await queryAll(conn, sql)
+    expect(rows).toEqual([{ revenue: 175 }])
+  })
+
+  it('leaves out SUM measures that share a sourceField, and keeps the rest', async () => {
+    const schema = makeSchema({
+      dimensions: [{ id: 'region', sourceField: 'region' }],
+      measures: [
+        { id: 'revenue', sourceField: 'revenue' },
+        { id: 'revenue_net', sourceField: 'revenue', expression: 'revenue - cost' },
+        { id: 'cost', sourceField: 'cost' },
+      ],
+    })
+    expect(getEligibleMeasureIds(schema)).toEqual(['cost'])
+    const sql = buildSummarySelectSQL(schema, ['region'])
+    await exec(conn, `CREATE TABLE view_dup AS ${sql}`)
+    const rows = sortRows(await queryAll(conn, 'SELECT * FROM view_dup'))
+    expect(rows).toEqual([{ region: 'APAC', cost: 45 }, { region: 'EMEA', cost: 20 }])
   })
 })
