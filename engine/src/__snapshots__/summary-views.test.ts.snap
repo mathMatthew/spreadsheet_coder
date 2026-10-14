@@ -1,0 +1,25 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`buildSummarySelectSQL > excludes non-SUM measures (MAX, MIN, COUNT, AVG) 1`] = `
+"SELECT "dept", CAST(SUM("revenue") AS DOUBLE) AS "revenue"
+FROM "data"
+GROUP BY "dept""
+`;
+
+exports[`buildSummarySelectSQL > generates correct SQL for SUM measures, columns named by sourceField 1`] = `
+"SELECT "region", "channel", CAST(SUM("revenue") AS DOUBLE) AS "revenue"
+FROM "data"
+GROUP BY "region", "channel""
+`;
+
+exports[`buildSummarySelectSQL > includes descriptionField columns 1`] = `
+"SELECT "region", "region_name", CAST(SUM("revenue") AS DOUBLE) AS "revenue"
+FROM "data"
+GROUP BY "region", "region_name""
+`;
+
+exports[`buildSummarySelectSQL > uses expression for aggregation input when present 1`] = `
+"SELECT "region", CAST(SUM(unit_price * quantity) AS DOUBLE) AS "line_total"
+FROM "data"
+GROUP BY "region""
+`;
